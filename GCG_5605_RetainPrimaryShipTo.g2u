@@ -1,0 +1,78 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+	'Purpose: Upon loading an order, fetch the primary ship to address for the order and display on the screen
+	'Order History Hooks Used:
+	'Hook 33009 - Post Order Load Hook
+	
+	'CHANGE HISTORY:
+	'9/9/19 - DD - Changed hooks from 33001 and 33002 to 33009.  This changes how the program runs, originally using the Script 1 button to pull up the data, now pulling it up when the order is changed.
+	f.Intrinsic.Control.Try
+		f.ODBC.Connection!con.opencompanyconnection
+		
+		f.Intrinsic.Control.SelectCase(v.Caller.Hook)
+			f.Intrinsic.Control.Case(33001)
+				v.passed.000153.Set("Get Prim Shp")
+			f.Intrinsic.Control.Caseany(33009,33002)				
+				f.Intrinsic.Control.CallSub(DisplayPrimaryShipTo)
+		f.Intrinsic.Control.EndSelect
+		
+		f.ODBC.Connection!con.Close
+	f.Intrinsic.Control.Catch
+		f.Intrinsic.Control.CallSub(ErrorMsg, CurrentSub, v.Ambient.CurrentSubroutine)
+	f.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.DisplayPrimaryShipTo.Start
+	f.Intrinsic.Control.Try
+		v.Local.sSQL.Declare(string)
+		V.Local.sCityStateZip.Declare(string)
+		
+		f.Intrinsic.ui.InvokeWaitDialog("Fetching primary ship-to address...")
+		'Get the ship to address from INVC_H_BLNKT_ADDR
+		f.Intrinsic.String.Build("select ship_name, ship_adrs1, ship_adrs2, ship_adrs3, ship_adrs4, ship_adrs5, ship_city, ship_state, ship_zip, ship_country, ship_attn from invc_h_blnkt_addr where blanket_no='{0}'", v.Passed.000002, v.Local.sSQL)
+		f.Data.DataTable.CreateFromSQL("dtAddr", "con", v.Local.sSQL)
+		
+		'Display to screen
+		f.Intrinsic.Control.If(v.DataTable.dtAddr.RowCount,>,0)
+			v.Passed.000014.Set(v.DataTable.dtAddr(0).ship_name!fieldvaltrim)
+			v.Passed.000016.Set(v.DataTable.dtAddr(0).ship_adrs1!fieldvaltrim)
+			v.Passed.000018.Set(v.DataTable.dtAddr(0).ship_adrs2!fieldvaltrim)
+			v.Passed.000022.Set(v.DataTable.dtAddr(0).ship_adrs3!fieldvaltrim)
+			v.Passed.000023.Set(v.DataTable.dtAddr(0).ship_adrs4!fieldvaltrim)
+			v.Passed.000024.Set(v.DataTable.dtAddr(0).ship_adrs5!fieldvaltrim)
+			v.Passed.000028.Set(v.DataTable.dtAddr(0).ship_attn!fieldvaltrim)
+			v.Passed.000101.Set(v.DataTable.dtAddr(0).ship_country!fieldvaltrim)
+			F.Intrinsic.String.Build("{0}, {1}  {2}",v.DataTable.dtAddr(0).ship_city!fieldvaltrim, v.DataTable.dtAddr(0).ship_state!fieldvaltrim, v.DataTable.dtAddr(0).ship_zip!fieldvaltrim, V.Local.sCityStateZip)
+			v.Passed.000102.Set(V.Local.sCityStateZip)
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.Catch
+		f.Intrinsic.Control.CallSub(ErrorMsg, CurrentSub, v.Ambient.CurrentSubroutine)
+	f.Intrinsic.Control.Finally
+		f.Intrinsic.UI.CloseWaitDialog
+	f.Intrinsic.Control.EndTry
+Program.Sub.DisplayPrimaryShipTo.End
+
+Program.Sub.ErrorMsg.Start
+v.Local.sError.Declare
+
+'Closes ODBC connection, default to connection : "con"
+f.Intrinsic.Control.If(v.ODBC!con.State, =, 1)
+	f.ODBC.Connection!con.Close
+f.Intrinsic.Control.EndIf
+
+'Generic Error message.
+f.Intrinsic.String.Build("Project GCG_5605_RetainPrimaryShipTo.g2u {0}{0}Subroutine: {1}{0}Error: {2} with Description: {3}", v.Ambient.NewLine, v.Args.CurrentSub, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+f.Intrinsic.UI.Msgbox(v.Local.sError)
+Program.Sub.ErrorMsg.End
+
+Program.Sub.Comments.Start
+	Author: Daniel Duncan
+	Customer: Load King
+	Program Name: Populate Ship-To Address in rder History by Order # Screen
+	Date Started: 7/15/2019
+	Description: This project allows the user to override the displayed ship-to address on the screen with the address that was used when the shipment occurred.
+	Quote: 11116-0
+	GAP: 5605
+Program.Sub.Comments.End
